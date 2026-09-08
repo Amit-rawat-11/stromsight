@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StormSight - Real-Time Physics-Aware AI Cyclone Prediction</title>
+  <meta name="description" content="Real-Time Physics-Aware AI system fusing multi-satellite asynchronous observations and thermodynamic parameters for early cyclone prediction.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-icon-wrapper">
+        <div class="brand-icon">
+          <i class="fa-solid fa-hurricane"></i>
+        </div>
+      </div>
+      <div class="brand-text">
+        <h1>StormSight</h1>
+        <p><span class="status-dot"></span> <strong>REAL-TIME LIVE STREAM ACTIVE</strong> • Indian Ocean Operations</p>
+      </div>
+    </div>
+
+    <!-- Indian Standard Time (IST) Clock & Live Ticker -->
+    <div class="time-clock-badge">
+      <i class="fa-solid fa-satellite-dish" style="color: var(--primary-cyan); animation: pulseDot 1.5s infinite;"></i>
+      <span id="liveClockDisplay" class="clock-text">Loading Live IST Time...</span>
+      <div class="time-zone-toggle">
+        <button id="tzIST" class="tz-btn active">🇮🇳 IST</button>
+        <button id="tzUTC" class="tz-btn">🌐 UTC</button>
+        <button id="tzLOCAL" class="tz-btn">💻 Local</button>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div id="liveStreamBadge" class="live-stream-badge">
+        <span class="live-pulse"></span> REAL-TIME FEED
+      </div>
+      <select id="scenarioSelect" class="scenario-select" aria-label="Select Cyclone Preset Scenario">
+        <option value="live">🔴 Live Stream: Real-Time Satellite & Marine Data</option>
+        <option value="amphan">Real Case: Super Cyclonic Storm Amphan (May 2020)</option>
+        <option value="katrina">Real Case: Hurricane Katrina (Aug 2005)</option>
+        <option value="fani">Real Case: Cyclone Fani (May 2019)</option>
+        <option value="severe">Preset: Very Severe Cyclone (Category 4)</option>
+        <option value="rapid">Preset: Rapid Intensification (High Risk)</option>
+        <option value="weakening">Preset: High Shear Dissipating Storm</option>
+      </select>
+      <button id="btnFetchLiveData" class="btn btn-primary">
+        <i class="fa-solid fa-arrows-rotate"></i> Sync Live Data Now
+      </button>
+    </div>
+  </header>
+
+  <main class="app-container">
+
+    <!-- STAGE 1: MULTI-SATELLITE INPUTS (ASYNCHRONOUS DATA) -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">1</div>
+        <h2 class="section-title">Multi-Satellite Inputs (Asynchronous Data)</h2>
+        <span class="section-desc">Different satellites observe the same location at different times</span>
+      </div>
+
+      <div class="satellite-grid">
+        
+        <!-- India Satellite (INSAT-3DR) -->
+        <div class="card sat-card" id="cardINSAT">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-satellite-dish" style="color: #ff70a6;"></i> India Satellite (INSAT-3DR)</span>
+            <span id="badgeINSAT" class="card-badge">Δt: 20 min</span>
+          </div>
+
+          <div class="sat-canvas-container">
+            <canvas id="canvasINSAT" class="sat-canvas"></canvas>
+            <div class="sat-live-tag">LIVE FEED</div>
+          </div>
+
+          <!-- Interactive Satellite Observation Time Control -->
+          <div class="sat-time-control">
+            <div class="sat-time-header">
+              <span>Observation Timestamp:</span>
+              <strong id="labelTimeINSAT" style="color: var(--primary-cyan); font-family: var(--font-mono);">Calculating...</strong>
+            </div>
+            <input type="time" id="inputTimeINSAT" class="sat-time-input">
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-item">Sat ID: <span>INSAT-3DR</span></div>
+            <div class="meta-item">Band: <span>Thermal IR (10.8µm)</span></div>
+            <div class="meta-item">Lat: <span>15.2° N</span></div>
+            <div class="meta-item">Lon: <span>70.4° E</span></div>
+          </div>
+        </div>
+
+        <!-- Europe Satellite (Meteosat-11) -->
+        <div class="card sat-card" id="cardMeteosat">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-satellite" style="color: #70d6ff;"></i> Europe Satellite (Meteosat)</span>
+            <span id="badgeMeteosat" class="card-badge delta-ref">Δt: 0 min (Ref)</span>
+          </div>
+
+          <div class="sat-canvas-container">
+            <canvas id="canvasMeteosat" class="sat-canvas"></canvas>
+            <div class="sat-live-tag">REF FRAME</div>
+          </div>
+
+          <div class="sat-time-control">
+            <div class="sat-time-header">
+              <span>Observation Timestamp (Ref):</span>
+              <strong id="labelTimeMeteosat" style="color: var(--success-emerald); font-family: var(--font-mono);">Calculating...</strong>
+            </div>
+            <input type="time" id="inputTimeMeteosat" class="sat-time-input">
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-item">Sat ID: <span>Meteosat-11</span></div>
+            <div class="meta-item">Band: <span>Water Vapor (6.2µm)</span></div>
+            <div class="meta-item">Lat: <span>15.2° N</span></div>
+            <div class="meta-item">Lon: <span>70.4° E</span></div>
+          </div>
+        </div>
+
+        <!-- Other Satellite (NOAA-20) -->
+        <div class="card sat-card" id="cardNOAA">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-globe" style="color: #ff9770;"></i> Other Satellite (NOAA-20)</span>
+            <span id="badgeNOAA" class="card-badge">Δt: 10 min</span>
+          </div>
+
+          <div class="sat-canvas-container">
+            <canvas id="canvasNOAA" class="sat-canvas"></canvas>
+            <div class="sat-live-tag">LIVE FEED</div>
+          </div>
+
+          <div class="sat-time-control">
+            <div class="sat-time-header">
+              <span>Observation Timestamp:</span>
+              <strong id="labelTimeNOAA" style="color: var(--primary-cyan); font-family: var(--font-mono);">Calculating...</strong>
+            </div>
+            <input type="time" id="inputTimeNOAA" class="sat-time-input">
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-item">Sat ID: <span>NOAA-20</span></div>
+            <div class="meta-item">Band: <span>VIIRS IR</span></div>
+            <div class="meta-item">Lat: <span>15.2° N</span></div>
+            <div class="meta-item">Lon: <span>70.4° E</span></div>
+          </div>
+        </div>
+
+        <!-- Additional Physical Data Card -->
+        <div class="card physics-card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-temperature-arrow-up" style="color: var(--warning-amber);"></i> Real-Time Physical Data</span>
+            <span id="badgeDataSync" class="card-badge" style="color: var(--success-emerald); border-color: rgba(16,185,129,0.3);">LIVE METEO</span>
+          </div>
+          
+          <div class="param-slider-group">
+            <div class="slider-item">
+              <div class="slider-label">
+                <span>Sea Surface Temp (SST)</span>
+                <strong id="valSST">30.5 °C</strong>
+              </div>
+              <input type="range" id="inputSST" min="20" max="34" step="0.5" value="30.5">
+            </div>
+
+            <div class="slider-item">
+              <div class="slider-label">
+                <span>Wind Shear</span>
+                <strong id="valShear">8.5 kts</strong>
+              </div>
+              <input type="range" id="inputShear" min="2" max="50" step="0.5" value="8.5">
+            </div>
+
+            <div class="slider-item">
+              <div class="slider-label">
+                <span>Atmospheric Moisture</span>
+                <strong id="valMoisture">88 %</strong>
+              </div>
+              <input type="range" id="inputMoisture" min="30" max="100" step="1" value="88">
+            </div>
+
+            <div class="slider-item">
+              <div class="slider-label">
+                <span>Central Pressure</span>
+                <strong id="valPressure">935 hPa</strong>
+              </div>
+              <input type="range" id="inputPressure" min="890" max="1013" step="1" value="935">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Key Point Callout -->
+      <div class="key-point-box" style="margin-top: 1.5rem;">
+        <i class="fa-solid fa-circle-info"></i>
+        <div>
+          <strong>Key Point:</strong> All satellites provide data at different times. We use the timestamp, location and satellite ID to align and fuse them instead of requiring exact same time images.
+        </div>
+      </div>
+    </section>
+
+
+    <!-- STAGE 2: PREPROCESSING & ENCODERS -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">2</div>
+        <h2 class="section-title">Preprocessing & Neural Encoders</h2>
+        <span class="section-desc">Calibration, geolocation, cloud/noise handling, ROI extraction</span>
+      </div>
+
+      <div class="encoder-grid">
+        
+        <!-- Image Encoder (CNN) -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-network-wired" style="color: var(--primary-cyan);"></i> Image Encoder (CNN)</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Extracts spatial visual features (vortex shape, eye wall, cloud density) from satellite image</p>
+          <div class="feature-bars" id="barsImage"></div>
+          <div style="font-family: var(--font-mono); font-size: 0.775rem; color: var(--primary-cyan); margin-top: 0.75rem;">
+            Vector: 128-d Visual Feature Embedding
+          </div>
+        </div>
+
+        <!-- Spatio-Temporal Encoder -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-violet);"></i> Spatio-Temporal Encoder</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Encodes lat, lon, timestamp, satellite ID and relative time difference (Δt)</p>
+          <div class="feature-bars" id="barsST"></div>
+          <div style="font-family: var(--font-mono); font-size: 0.775rem; color: var(--accent-violet); margin-top: 0.75rem;">
+            Recency Decay: w(Δt) = e^(-0.02 * Δt)
+          </div>
+        </div>
+
+        <!-- Physics Encoder -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-atom" style="color: var(--warning-amber);"></i> Physics Encoder</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Encodes SST, wind shear, moisture, pressure thermodynamic metrics</p>
+          <div class="feature-bars" id="barsPhysics"></div>
+          <div style="font-family: var(--font-mono); font-size: 0.775rem; color: var(--warning-amber); margin-top: 0.75rem;">
+            Vector: 64-d Physics Feature Embedding
+          </div>
+        </div>
+
+      </div>
+
+      <div class="key-point-box" style="margin-top: 1.25rem; border-color: rgba(139, 92, 246, 0.4);">
+        <i class="fa-solid fa-hourglass-half" style="color: var(--accent-violet);"></i>
+        <div>
+          Here, time difference (Δt) tells the model how old each observation is, so it can give more weight to recent data and less weight to older data.
+        </div>
+      </div>
+    </section>
+
+
+    <!-- STAGE 3: FEATURE FUSION -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">3</div>
+        <h2 class="section-title">Feature Fusion</h2>
+        <span class="section-desc">Combines image features + location-time features + physical features</span>
+      </div>
+
+      <div class="card fusion-card">
+        <div class="card-header">
+          <span class="card-title-text"><i class="fa-solid fa-layer-group" style="color: var(--primary-cyan);"></i> Unified Multi-Modal Fused Representation (256-d)</span>
+          <span class="card-badge" id="badgeFusionWeight">Weighted Recency Sum: 2.54</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Fused Embedding distribution across modalities:</p>
+
+        <div class="fusion-bar-combined">
+          <div class="fusion-seg seg-img">IMAGE FEATURES (128-d)</div>
+          <div class="fusion-seg seg-st">SPATIO-TEMPORAL (64-d)</div>
+          <div class="fusion-seg seg-phys">PHYSICS (64-d)</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- STAGES 4 & 5: STORMSIGHT MODEL & OUTPUT -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">4 & 5</div>
+        <h2 class="section-title">StormSight Model & Forecast Output</h2>
+        <span class="section-desc">Physics-aware Transformer / LSTM sequence inference</span>
+      </div>
+
+      <div class="output-grid">
+        
+        <!-- Predictions Panel -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-brain" style="color: var(--primary-cyan);"></i> StormSight Prediction Engine</span>
+          </div>
+
+          <div class="intensity-badge-box">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Cyclone Intensity Class</div>
+            <div id="textIntensityClass" class="intensity-title">Very Severe Cyclonic Storm</div>
+            <div style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.4rem;">Est Max Wind: <span id="textWindSpeed" style="color: #fff; font-weight: 700;">95 kts</span></div>
+          </div>
+
+          <div class="confidence-gauge-container">
+            <svg width="190" height="190" viewBox="0 0 190 190">
+              <circle cx="95" cy="95" r="78" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14"/>
+              <circle id="gaugeConfidence" cx="95" cy="95" r="78" fill="none" stroke="var(--primary-cyan)" stroke-width="14"
+                      stroke-dasharray="490" stroke-dashoffset="30" stroke-linecap="round" transform="rotate(-90 95 95)" style="transition: stroke-dashoffset 1s ease;"/>
+            </svg>
+            <div id="valConfidence" class="confidence-val">96.1%</div>
+          </div>
+
+          <div style="background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); padding: 0.9rem 1.1rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--danger-crimson); display: flex; align-items: center; gap: 0.8rem;">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.3rem;"></i>
+            <div>
+              <strong>Future Intensity Trend:</strong><br>
+              <span id="textTrend">Rapid Intensification Warning (⚠️ High Risk)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Map Panel -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-map-location-dot" style="color: var(--primary-cyan);"></i> Predicted Storm Track Trajectory</span>
+            <span class="card-badge">Arabian Sea / Bay of Bengal Basin</span>
+          </div>
+
+          <div class="track-map-container">
+            <canvas id="trackMapCanvas"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- STAGE 6: CONFIDENCE-BASED DECISION -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">6</div>
+        <h2 class="section-title">Confidence-Based Decision Routing</h2>
+        <span class="section-desc">Automated data verification vs human-in-the-loop meteorologist review</span>
+      </div>
+
+      <div class="decision-grid">
+        
+        <!-- High Confidence Path -->
+        <div class="card decision-card high-conf" id="cardHighConf">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-circle-check" style="color: var(--success-emerald);"></i> High Confidence Branch</span>
+            <span class="badge-status status-green"><i class="fa-solid fa-check"></i> Quality Verified</span>
+          </div>
+          <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            Confidence score exceeds safety threshold (≥ 85%). Prediction verified & automatically added to active training dataset.
+          </p>
+          <button class="btn btn-outline" style="border-color: var(--success-emerald); color: var(--success-emerald);">
+            <i class="fa-solid fa-database"></i> Auto-Stored in Training Set
+          </button>
+        </div>
+
+        <!-- Low Confidence Path -->
+        <div class="card decision-card low-conf" id="cardLowConf">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-user-doctor" style="color: var(--danger-crimson);"></i> Low Confidence / Human Review</span>
+            <span class="badge-status status-red"><i class="fa-solid fa-flag"></i> Requires Meteorologist</span>
+          </div>
+          <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            Confidence score below threshold (&lt; 85%) or edge-case anomaly detected. Flagged for expert meteorologist inspection.
+          </p>
+          <button id="btnOpenReviewModal" class="btn btn-outline" style="border-color: var(--danger-crimson); color: var(--danger-crimson);">
+            <i class="fa-solid fa-microscope"></i> Open Meteorologist Review Queue
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- STAGE 7: RETRAIN MODEL -->
+    <section class="pipeline-section">
+      <div class="section-header">
+        <div class="section-number">7</div>
+        <h2 class="section-title">Retrain Model</h2>
+        <span class="section-desc">Continuous self-improving active learning loop</span>
+      </div>
+
+      <div class="retrain-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-arrows-rotate" style="color: var(--primary-cyan);"></i> Active Learning Engine</span>
+            <button id="btnTriggerRetrain" class="btn btn-primary" style="padding: 0.45rem 1.1rem; font-size: 0.825rem;">
+              <i class="fa-solid fa-rotate"></i> Retrain Model Now
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1.2rem;">
+            <div class="meta-item" style="text-align: center; padding: 0.85rem;">
+              <span style="color: var(--text-muted); font-size: 0.75rem;">VERIFIED SAMPLES</span>
+              <strong id="valRetrainSamples" style="font-size: 1.35rem; font-family: var(--font-mono); color: var(--primary-cyan);">42</strong>
+            </div>
+
+            <div class="meta-item" style="text-align: center; padding: 0.85rem;">
+              <span style="color: var(--text-muted); font-size: 0.75rem;">TRAINING LOSS</span>
+              <strong id="valTrainingLoss" style="font-size: 1.35rem; font-family: var(--font-mono); color: var(--success-emerald);">0.1420</strong>
+            </div>
+
+            <div class="meta-item" style="text-align: center; padding: 0.85rem;">
+              <span style="color: var(--text-muted); font-size: 0.75rem;">VAL ACCURACY</span>
+              <strong id="valRetrainAcc" style="font-size: 1.35rem; font-family: var(--font-mono); color: var(--warning-amber);">94.8%</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title-text"><i class="fa-solid fa-chart-line" style="color: var(--primary-cyan);"></i> Training Convergence Loss Curve</span>
+          </div>
+          <div class="loss-chart-container">
+            <canvas id="lossCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Meteorologist Review Modal -->
+  <div id="reviewModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">
+          <i class="fa-solid fa-user-check" style="color: var(--primary-cyan);"></i> Meteorologist Verification Panel
+        </h3>
+        <button id="btnCloseModal" style="background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer;">&times;</button>
+      </div>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Sample flagged for review due to conflicting microwave radar observations vs IR thermal signatures.
+      </p>
+      <div style="background: rgba(0,0,0,0.5); padding: 1.1rem; border-radius: var(--radius-sm); font-size: 0.85rem; font-family: var(--font-mono); margin-bottom: 1.5rem; border: 1px solid rgba(255,255,255,0.08);">
+        <div>Assessed Intensity: Very Severe Cyclonic Storm</div>
+        <div>Model Confidence: 78.4% (Below 85% Threshold)</div>
+        <div>Suggested Override: Confirm Category 3 Status</div>
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button id="btnApproveOverride" class="btn btn-primary">
+          <i class="fa-solid fa-check"></i> Approve & Add to Dataset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    StormSight Physics-Aware AI Architecture • Real-Time Satellite Stream Active • Indian Ocean Cyclone Operations Center
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
