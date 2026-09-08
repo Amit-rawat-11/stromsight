@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StormSight — Cyclone Intelligence Operations Center</title>
+  <meta name="description" content="StormSight: Physics-Aware AI Cyclone Prediction & Track Forecasting System. Real-time IBTrACS data, multi-satellite fusion, PyTorch deep learning.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- BOOT SPLASH -->
+  <div id="bootSplash" class="boot-splash">
+    <div class="boot-content">
+      <div class="boot-logo">
+        <div class="storm-icon-large">🌀</div>
+        <h1 class="boot-title">STORMSIGHT</h1>
+        <div class="boot-subtitle">CYCLONE INTELLIGENCE OPERATIONS CENTER</div>
+      </div>
+      <div class="boot-progress-wrap">
+        <div class="boot-progress-bar" id="bootProgress"></div>
+      </div>
+      <div class="boot-status" id="bootStatus">Initializing deep learning inference engine...</div>
+      <div class="boot-version">v3.0-PyTorch-Transformer · IBTrACS-WMO-v4.1 · Multi-Satellite Fusion</div>
+    </div>
+  </div>
+
+  <!-- TOP COMMAND BAR -->
+  <header class="top-bar" id="mainContent" style="opacity:0;">
+    <div class="brand-section">
+      <div class="brand-icon">🌀</div>
+      <div>
+        <div class="brand-title">StormSight</div>
+        <div class="brand-subtitle">CYCLONE INTELLIGENCE OPS CENTER</div>
+      </div>
+    </div>
+
+    <div class="cyclone-selector-bar">
+      <label class="selector-label">ACTIVE CYCLONE:</label>
+      <select id="cycloneSelect" class="cyclone-select">
+        <option value="NIO_2020_AMPHAN">🌀 AMPHAN — Bay of Bengal (May 2020)</option>
+        <option value="NIO_2019_FANI">🌀 FANI — Bay of Bengal (Apr–May 2019)</option>
+        <option value="NATL_2005_KATRINA">🌀 KATRINA — Gulf of Mexico (Aug 2005)</option>
+        <option value="WPAC_1979_TIP">🌀 TIP — West Pacific (Oct 1979)</option>
+        <option value="NIO_2021_TAUKTAE">🌀 TAUKTAE — Arabian Sea (May 2021)</option>
+        <option value="WPAC_2013_HAIYAN">🌀 HAIYAN — West Pacific (Nov 2013)</option>
+      </select>
+      <button class="btn-refresh" id="btnRefresh" onclick="loadCyclone()">
+        <span id="refreshIcon">⟳</span> RELOAD
+      </button>
+    </div>
+
+    <div class="status-indicators">
+      <div class="status-item" id="apiStatus">
+        <span class="status-dot dot-green"></span>
+        <span class="status-label">API</span>
+        <span class="status-value" id="stApiStatus">ONLINE</span>
+      </div>
+      <div class="status-item">
+        <span class="status-dot dot-green"></span>
+        <span class="status-label">MODEL</span>
+        <span class="status-value" id="stModel">v3.0-PyTorch</span>
+      </div>
+      <div class="status-item">
+        <span class="status-dot dot-amber pulse-dot"></span>
+        <span class="status-label">PIPELINE</span>
+        <span class="status-value">ACTIVE</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">IST</span>
+        <span class="status-value" id="stClockIST">--:--:--</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">UTC</span>
+        <span class="status-value" id="stClockUTC">--:--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN GRID -->
+  <main class="command-grid" id="mainGrid" style="opacity:0;">
+
+    <!-- ===== LEFT PANEL: CYCLONE INTEL ===== -->
+    <section class="panel panel-left">
+      <div class="panel-header">
+        <span class="panel-title">◈ Cyclone Intelligence</span>
+        <span class="panel-badge badge-live">LIVE DATA</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- Intensity badge -->
+        <div class="intensity-banner" id="intensityBanner">
+          <div class="intensity-label">CURRENT INTENSITY CLASS</div>
+          <div class="intensity-name" id="txtIntensityClass">Loading...</div>
+          <div class="intensity-metrics">
+            <div class="imet"><span class="imet-val" id="txtWind">—</span><span class="imet-unit">kts max wind</span></div>
+            <div class="imet"><span class="imet-val" id="txtPressure">—</span><span class="imet-unit">hPa pressure</span></div>
+          </div>
+        </div>
+
+        <!-- Cyclone data table -->
+        <table class="data-table">
+          <tr><td class="dt-label">Cyclone ID</td><td class="dt-val" id="txtID">—</td></tr>
+          <tr><td class="dt-label">Name / Basin</td><td class="dt-val" id="txtNameBasin">—</td></tr>
+          <tr><td class="dt-label">Current Position</td><td class="dt-val" id="txtPos">—</td></tr>
+          <tr><td class="dt-label">Last Observation</td><td class="dt-val" id="txtObsTime">—</td></tr>
+          <tr><td class="dt-label">Sea Surface Temp</td><td class="dt-val" id="txtSST">—</td></tr>
+          <tr><td class="dt-label">Vertical Wind Shear</td><td class="dt-val" id="txtShear">—</td></tr>
+          <tr><td class="dt-label">Atmospheric Moisture</td><td class="dt-val" id="txtMoisture">—</td></tr>
+          <tr><td class="dt-label">Observation Count</td><td class="dt-val" id="txtObsCount">—</td></tr>
+        </table>
+
+        <!-- Data source badge -->
+        <div class="source-badge">
+          <div class="sb-row"><span class="sb-dot"></span>Source: IBTrACS WMO Authoritative Archive</div>
+          <div class="sb-row"><span class="sb-dot"></span>Resolution: 6h Synoptic Track Observations</div>
+          <div class="sb-row" id="sbDataMode"><span class="sb-dot green"></span>Mode: REAL_MODE (IBTrACS)</div>
+        </div>
+
+        <!-- Satellite timeline -->
+        <div class="section-title">MULTI-SATELLITE OBSERVATIONS</div>
+        <div class="sat-list" id="satList">
+          <div class="sat-item">
+            <div class="sat-icon">🛰</div>
+            <div class="sat-info">
+              <div class="sat-name">INSAT-3DR (ISRO)</div>
+              <div class="sat-channel">Thermal IR 10.8µm</div>
+            </div>
+            <div class="sat-timing">
+              <div class="sat-time" id="tINSAT">—</div>
+              <div class="sat-delta" id="dtINSAT">Δt: 20m</div>
+            </div>
+          </div>
+          <div class="sat-item">
+            <div class="sat-icon">🛰</div>
+            <div class="sat-info">
+              <div class="sat-name">Meteosat-11 (EUMETSAT)</div>
+              <div class="sat-channel">Water Vapor 6.2µm</div>
+            </div>
+            <div class="sat-timing">
+              <div class="sat-time" id="tMeteosat">—</div>
+              <div class="sat-delta ref">Δt: 0m (REF)</div>
+            </div>
+          </div>
+          <div class="sat-item">
+            <div class="sat-icon">🛰</div>
+            <div class="sat-info">
+              <div class="sat-name">NOAA-20 (NESDIS)</div>
+              <div class="sat-channel">VIIRS IR 11.45µm</div>
+            </div>
+            <div class="sat-timing">
+              <div class="sat-time" id="tNOAA">—</div>
+              <div class="sat-delta" id="dtNOAA">Δt: 10m</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ===== CENTER PANEL: MAP ===== -->
+    <section class="panel panel-center">
+      <div class="panel-header">
+        <span class="panel-title">◈ Geospatial Track & Forecast Trajectory</span>
+        <span class="panel-badge badge-info">WGS84 EPSG:4326</span>
+      </div>
+      <div class="panel-body p0">
+        <div id="map"></div>
+        <!-- Map legend -->
+        <div class="map-legend">
+          <div class="legend-item"><span class="leg-dot leg-track"></span>Observed Track</div>
+          <div class="legend-item"><span class="leg-dot leg-forecast"></span>Forecast Waypoints</div>
+          <div class="legend-item"><span class="leg-dot leg-current"></span>Current Position</div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ===== RIGHT PANEL: PREDICTION INTELLIGENCE ===== -->
+    <section class="panel panel-right">
+      <div class="panel-header">
+        <span class="panel-title">◈ Prediction Intelligence</span>
+        <span class="panel-badge badge-model" id="txtModelVer">v3.0-PyTorch</span>
+      </div>
+      <div class="panel-body">
+
+        <!-- AI Intensity Prediction -->
+        <div class="pred-section">
+          <div class="pred-label">AI PREDICTED INTENSITY</div>
+          <div class="pred-intensity" id="predIntensity">Loading...</div>
+        </div>
+
+        <!-- Confidence / Uncertainty Grid -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="mc-label">CALIBRATED CONFIDENCE</div>
+            <div class="mc-val" id="predConf">—</div>
+            <div class="mc-sub">Temperature Scaled (T=1.25)</div>
+            <div class="mc-bar-wrap"><div class="mc-bar" id="barConf" style="width:0%"></div></div>
+          </div>
+          <div class="metric-card">
+            <div class="mc-label">EPISTEMIC UNCERTAINTY</div>
+            <div class="mc-val amber" id="predUncertainty">—</div>
+            <div class="mc-sub">Normalized Entropy Index</div>
+            <div class="mc-bar-wrap"><div class="mc-bar amber" id="barUnc" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- RI Risk Banner -->
+        <div class="ri-banner" id="riBanner">
+          <div class="ri-label">⚡ RAPID INTENSIFICATION (RI) RISK</div>
+          <div class="ri-value" id="predRIRisk">—</div>
+        </div>
+
+        <!-- Model Transparency -->
+        <div class="section-title">MODEL ATTRIBUTION</div>
+        <div class="attribution-bars">
+          <div class="attr-row">
+            <span class="attr-label">🛰 Image Features</span>
+            <div class="attr-bar-bg"><div class="attr-bar img-bar" id="attrImg" style="width:48.5%"></div></div>
+            <span class="attr-pct" id="attrImgPct">48.5%</span>
+          </div>
+          <div class="attr-row">
+            <span class="attr-label">⏱ Spatio-Temporal</span>
+            <div class="attr-bar-bg"><div class="attr-bar st-bar" id="attrST" style="width:26.2%"></div></div>
+            <span class="attr-pct" id="attrSTPct">26.2%</span>
+          </div>
+          <div class="attr-row">
+            <span class="attr-label">🌡 Physics Params</span>
+            <div class="attr-bar-bg"><div class="attr-bar phys-bar" id="attrPhys" style="width:25.3%"></div></div>
+            <span class="attr-pct" id="attrPhysPct">25.3%</span>
+          </div>
+        </div>
+
+        <!-- Forecast Waypoints -->
+        <div class="section-title">FORECAST TRACK WAYPOINTS</div>
+        <div id="waypointContainer" class="waypoint-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Review Routing -->
+        <div id="reviewSection" class="review-section" style="display:none;">
+          <div class="review-header">🔬 HUMAN REVIEW QUEUED</div>
+          <div class="review-body" id="reviewBody">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BOTTOM TIMELINE BAR ===== -->
+    <footer class="timeline-footer">
+      <div class="tf-block">
+        <div class="tf-title">MODEL TRANSPARENCY</div>
+        <div class="tf-detail" id="tfTransparency">Image: 48.5% | Temporal: 26.2% | Physics: 25.3%</div>
+        <div class="tf-sub" id="tfLatency">Latency: 14.2ms · Dataset: IBTrACS-WMO-v4.1</div>
+      </div>
+      <div class="tf-block">
+        <div class="tf-title">DATA QUALITY</div>
+        <div class="tf-detail green" id="tfQuality">Observations Complete (100.0%)</div>
+        <div class="tf-sub" id="tfMissing">Missing Variables: None</div>
+      </div>
+      <div class="tf-block">
+        <div class="tf-title">ACTIVE LEARNING</div>
+        <div class="tf-detail" id="tfReviewCount">Pending Reviews: —</div>
+        <div class="tf-sub" id="tfReviewed">Reviewed: —</div>
+      </div>
+      <div class="tf-block">
+        <div class="tf-title">TIMESTAMP (IST / UTC)</div>
+        <div class="tf-detail" id="tfIST">—</div>
+        <div class="tf-sub" id="tfUTC">—</div>
+      </div>
+    </footer>
+
+  </main>
+
+  <!-- ERROR TOAST -->
+  <div id="toast" class="toast hidden">
+    <span id="toastMsg"></span>
+    <button onclick="document.getElementById('toast').classList.add('hidden')">✕</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
